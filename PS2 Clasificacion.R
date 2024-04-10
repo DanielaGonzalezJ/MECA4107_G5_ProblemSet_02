@@ -139,29 +139,17 @@ arbol_clasificacion_rpart
 
 prp(arbol_clasificacion_rpart, under = TRUE, branch.lty = 2, yesno = 2, faclen = 0, varlen=15,box.palette = "-RdYlGn")
 
-# Error de test del modelo final con Martiz de Confusión
-predicciones_rpart <- data.frame(
-  obs = test$Pobre,                                    ## Observados
-  pred = predict(arbol_clasificacion_rpart, newdata = test, type = "class")    ## Predichos
-)
-
 
 #Envío para Kaggle
 
 predictSample <- test   %>% 
-  mutate(pobre_lab = predict(arbol_clasificacion_rpart, newdata = test, type = "raw")    ## predicted class labels
+  mutate(pobre_lab = predict(arbol_clasificacion_rpart, newdata = test, type = "class")    ## predicted class labels
   )  %>% select(id,pobre_lab)
 
 head(predictSample)
-
-
-
-
 
 predictSample<- predictSample %>% 
   mutate(pobre=ifelse(pobre_lab=="Yes",1,0)) %>% 
   select(id,pobre)
 
-template<-read.csv("Data/sample_submission.csv")
 write.csv(predictSample,"classification_CARTS.csv", row.names = FALSE)
-
