@@ -8,7 +8,8 @@ p_load( tidyverse, # tidy-data
         glmnet, # To implement regularization algorithms. 
         caret, # creating predictive models
         rpart, #Árbol
-        rpart.plot #Graficos de Árbol
+        rpart.plot, #Graficos de Árbol
+        ranger #Random Forest
 )
 
 #Cargamos la base de datos
@@ -18,9 +19,6 @@ train_personas<-read.csv("Data/train_personas.csv")
 test_hogares<-read.csv("data/test_hogares.csv")
 test_personas<-read.csv("data/test_personas.csv")
 
-colnames(train_hogares)
-colnames(train_personas)
-
 #Preprocesamiento Personas
 
 ptrain_personas<- train_personas %>% mutate(
@@ -28,13 +26,13 @@ ptrain_personas<- train_personas %>% mutate(
   cabecera = Clase,# 1 si reside en áreas urbanas
   edad=P6040,
   jefe = ifelse(P6050== 1, 1, 0), # 1 si es jefe de hogar
-  menor = ifelse(P6040<=6,1,0), # Menores de 6 años
+  menor = ifelse(P6040<=12,1,0), # Menores de 12 años
   EducLevel = ifelse(P6210==9|P6210==0,0,P6210), #No sabe no responde es 0
   ocupado = ifelse(is.na(Oc),0,1), 
   contributivo=ifelse(P6090==1|P6090==2,1,0), #No sabe no responde es 0 (1 )
   trabaja=ifelse(P6240==1,1,0), # 1 si el individuo trabaja
   Oficio=ifelse(is.na(Oficio),0,Oficio), 
-  trabaja_solo=ifelse(P6870==1,1,0), # 1 Si el individuo trabaja solo
+  trabaja_solo=ifelse(P6870==1|is.na(P6870),1,0), # 1 Si el individuo trabaja solo
   h_trabajadas=ifelse(is.na(P6800),0,P6800),
   tiempotrab = P6426,# Tiempo que lleva trabajando en la empresa
   sin_pension = ifelse((P7500s2 == 2 | is.na(P7500s2)) & ((edad >= 62 & genero == 0) | (edad >= 57 & genero == 1)), 1, 0), #Sin pension cuando debería
@@ -52,13 +50,13 @@ ptest_personas<- test_personas %>% mutate(
   cabecera = Clase,# 1 si reside en áreas urbanas
   edad=P6040,
   jefe = ifelse(P6050== 1, 1, 0), # 1 si es jefe de hogar
-  menor = ifelse(P6040<=6,1,0), # Menores de 6 años
+  menor = ifelse(P6040<=12,1,0), # Menores de 12 años
   EducLevel = ifelse(P6210==9|P6210==0,0,P6210), #No sabe no responde es 0
   ocupado = ifelse(is.na(Oc),0,1), 
   contributivo=ifelse(P6090==1|P6090==2,1,0), #No sabe no responde es 0 (1 )
   trabaja=ifelse(P6240==1,1,0), # 1 si el individuo trabaja
   Oficio=ifelse(is.na(Oficio),0,Oficio), 
-  trabaja_solo=ifelse(P6870==1,1,0), # 1 Si el individuo trabaja solo
+  trabaja_solo=ifelse(P6870==1|is.na(P6870),1,0), # 1 Si el individuo trabaja solo
   h_trabajadas=ifelse(is.na(P6800),0,P6800),
   tiempotrab = P6426,# Tiempo que lleva trabajando en la empresa
   sin_pension = ifelse((P7500s2 == 2 | is.na(P7500s2)) & ((edad >= 62 & genero == 0) | (edad >= 57 & genero == 1)), 1, 0), #Sin pension cuando debería
@@ -77,7 +75,7 @@ train_personas_nivel_hogar<- ptrain_personas %>%
             maxEducLevel=max(EducLevel,na.rm=TRUE),
             nocupados=sum(ocupado,na.rm=TRUE),
             rel_pet=sum(pet,na.rm=TRUE)/max(Orden,na.rm=TRUE),
-            trab_por_persona=sum(h_trabajadas)/max(Orden,na.rm=TRUE)
+            horas_trab_por_persona=sum(h_trabajadas)/max(Orden,na.rm=TRUE)
   )
 
 train_personas_hogar<- ptrain_personas %>% 
@@ -88,7 +86,8 @@ train_personas_hogar<- ptrain_personas %>%
          jefe_ocupado=ocupado,
          jefe_solo=trabaja_solo,
          jefe_contrib=contributivo,
-         jefe_sin_pension=sin_pension) %>% 
+         jefe_sin_pension=sin_pension,
+         jefe_edad=edad) %>% 
   left_join(train_personas_nivel_hogar)
 
 
@@ -100,7 +99,7 @@ test_personas_nivel_hogar<- ptest_personas %>%
             maxEducLevel=max(EducLevel,na.rm=TRUE),
             nocupados=sum(ocupado,na.rm=TRUE),
             rel_pet=sum(pet,na.rm=TRUE)/max(Orden,na.rm=TRUE),
-            trab_por_persona=sum(h_trabajadas)/max(Orden,na.rm=TRUE)
+            horas_trab_por_persona=sum(h_trabajadas)/max(Orden,na.rm=TRUE)
   )
 
 test_personas_hogar<- ptest_personas %>% 
@@ -111,7 +110,8 @@ test_personas_hogar<- ptest_personas %>%
          jefe_ocupado=ocupado,
          jefe_solo=trabaja_solo,
          jefe_contrib=contributivo,
-         jefe_sin_pension=sin_pension) %>% 
+         jefe_sin_pension=sin_pension,
+         jefe_edad=edad) %>% 
   left_join(test_personas_nivel_hogar)
 
 #Criterio de Pobreza del DANE
@@ -138,31 +138,50 @@ test<- ptest_hogares %>%
 #Para Train
 train<- train %>% 
   mutate(Pobre=factor(Pobre,levels=c(0,1),labels=c("No","Yes")),
+         arrienda=factor(arrienda),
          Dominio=factor(Dominio),
-         jefe_Educ_level=factor(jefe_Educ_level,levels=c(0:6), labels=c("Ns",'Ninguno', 'Preescolar','Primaria', 'Secundaria','Media', 'Universitaria')),
+         jefe_Educ_level=factor(jefe_Educ_level,levels=c(1:6), labels=c('Ninguno', 'Preescolar','Primaria', 'Secundaria','Media', 'Universitaria')),
          maxEducLevel=factor(maxEducLevel,levels=c(0:6), labels=c("Ns",'Ninguno', 'Preescolar','Primaria', 'Secundaria','Media', 'Universitaria')),
          jefe_contrib=factor(jefe_contrib),
          jefe_sin_pension=factor(jefe_sin_pension),
          jefe_mujer=factor(jefe_mujer),
          jefe_ocupado=factor(jefe_ocupado),
-         jefe_solo=factor(jefe_solo),
+         jefe_solo=factor(jefe_solo)
+         
          
   )
 #Para Test
 test<- test %>% 
   mutate(Dominio=factor(Dominio),
-         jefe_Educ_level=factor(jefe_Educ_level,levels=c(0:6), labels=c("Ns",'Ninguno', 'Preescolar','Primaria', 'Secundaria','Media', 'Universitaria')),
+         arrienda=factor(arrienda),
+         jefe_Educ_level=factor(jefe_Educ_level,levels=c(1:6), labels=c('Ninguno', 'Preescolar','Primaria', 'Secundaria','Media', 'Universitaria')),
          maxEducLevel=factor(maxEducLevel,levels=c(0:6), labels=c("Ns",'Ninguno', 'Preescolar','Primaria', 'Secundaria','Media', 'Universitaria')),
          jefe_contrib=factor(jefe_contrib),
          jefe_sin_pension=factor(jefe_sin_pension),
          jefe_mujer=factor(jefe_mujer),
          jefe_ocupado=factor(jefe_ocupado),
-         jefe_solo=factor(jefe_solo),
+         jefe_solo=factor(jefe_solo)
          
   )
 
+#Entrenamiento del Modelo Random Forest
 
-#Entrenamiento del modelo
+set.seed(2618)
+tree_ranger_grid <- train(
+  Pobre~.,
+  data=train,
+  method = "ranger",
+  trControl = fitControl,
+  tuneGrid=expand.grid(
+    mtry = c(1,2,3),
+    splitrule = "variance",
+    min.node.size = c(1,3,5)),
+  importance="impurity"
+)
+
+
+
+#Entrenamiento del modelo Carts
 
 set.seed(2618)
 arbol_clasificacion_rpart <- rpart(Pobre~., 
