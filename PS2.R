@@ -30,9 +30,23 @@ process_personas <- function(data, ...) {
     select(id,Orden,Niveleduc,Segsoc,Tiempotrab,Ocupado,genero,pension,jefe)
     
 }
+
+process_personas_test <- function(data, ...) {
+  test_personas <- test_personas %>% mutate(
+    Niveleduc = ifelse(P6210==9,0,P6210),
+    Segsoc = ifelse(P6100==4,3,P6100),
+    Tiempotrab = P6426,
+    Ocupado = ifelse(is.na(Oc),0,1),
+    genero = P6020,
+    pension = P6920,
+    jefe = ifelse(P6050==1,1,0)
+  ) %>% 
+    select(id,Orden,Niveleduc,Segsoc,Tiempotrab,Ocupado,genero,pension,jefe)
+  
+}
   
   train_personas <- process_personas(train_personas)
-  test_personas <- process_personas(test_personas)
+  test_personas <- process_personas_test(test_personas)
 
 
 ##Modelo1 #Train
@@ -102,20 +116,21 @@ train<- train %>%
   )
 
 test<- test %>% 
-  mutate(Pobre=factor(Pobre,levels=c(0,1),labels=c("No","Yes")),
-         Dominio=factor(Dominio),
+  mutate(Dominio=factor(Dominio),
          jefe_Educ_level=factor(jefe_Educ_level,levels=c(0:6), labels=c("Ns",'Ninguno', 'Preescolar','Primaria', 'Secundaria','Media', 'Universitaria')),
          maxEducLevel=factor(maxEducLevel,levels=c(0:6), labels=c("Ns",'Ninguno', 'Preescolar','Primaria', 'Secundaria','Media', 'Universitaria'))
   )
 
 ##Modelo1
 
-modelo1 <- glm(Pobre ~Dominio + jefe_Educ_level + maxEducLevel + jefe_Ocupado + jefe_pension + jefe_seguridad)
+modelo1 <- glm(Pobre ~Dominio + jefe_Educ_level + maxEducLevel + jefe_ocupado + jefe_pension + jefe_seguridad, 
+               family = "binomial",
+               data = train)
 
    ##Predicción
 
 predictSample <- test   %>% 
-  mutate(pobre_lab = predict(modelo1, newdata = test, type = "raw")    ## predicted class labels
+  mutate(pobre_lab = predict(modelo1, newdata = test)    ## predicted class labels
   )  %>% select(id,pobre_lab)
 
 
