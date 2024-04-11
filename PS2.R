@@ -130,13 +130,12 @@ modelo1 <- glm(Pobre ~Dominio + jefe_Educ_level + maxEducLevel + jefe_ocupado + 
    ##Predicción
 
 predictSample <- test   %>% 
-  mutate(pobre_lab = predict(modelo1, newdata = test)    ## predicted class labels
+  mutate(pobre_lab = predict(modelo1, newdata = test, type = "response") ## predicted class labels
   )  %>% select(id,pobre_lab)
-
 
     ##Formato Kaggle
     predictSample <- predictSample %>% 
-      mutate(pobre = ifelse(pobre_lab=="Yes",1,0)) %>% select(id, pobre)
+      mutate(pobre = ifelse(pobre_lab > 0.5,1,0)) %>% select(id, pobre)
     
     write.csv(predictSample, "Logit.csv", row.names = FALSE)
   
