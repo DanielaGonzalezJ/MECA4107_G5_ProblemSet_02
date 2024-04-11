@@ -137,7 +137,7 @@ train<- train %>%
          arrienda=factor(arrienda),
          Dominio=factor(Dominio),
          jefe_Educ_level=factor(jefe_Educ_level,levels=c(1:6), labels=c('Ninguno', 'Preescolar','Primaria', 'Secundaria','Media', 'Universitaria')),
-         maxEducLevel=factor(maxEducLevel,levels=c(1:7), labels=c("Ns",'Ninguno', 'Preescolar','Primaria', 'Secundaria','Media', 'Universitaria')),
+         maxEducLevel=factor(maxEducLevel,levels=c(1:6), labels=c('Ninguno', 'Preescolar','Primaria', 'Secundaria','Media', 'Universitaria')),
          jefe_contrib=factor(jefe_contrib),
          jefe_sin_pension=factor(jefe_sin_pension),
          jefe_mujer=factor(jefe_mujer),
@@ -151,7 +151,7 @@ test<- test %>%
   mutate(Dominio=factor(Dominio),
          arrienda=factor(arrienda),
          jefe_Educ_level=factor(jefe_Educ_level,levels=c(1:6), labels=c('Ninguno', 'Preescolar','Primaria', 'Secundaria','Media', 'Universitaria')),
-         maxEducLevel=factor(maxEducLevel,levels=c(1:7), labels=c('NS', 'Ninguno', 'Preescolar','Primaria', 'Secundaria','Media', 'Universitaria')),
+         maxEducLevel=factor(maxEducLevel,levels=c(1:6), labels=c('Ninguno', 'Preescolar','Primaria', 'Secundaria','Media', 'Universitaria')),
          jefe_contrib=factor(jefe_contrib),
          jefe_sin_pension=factor(jefe_sin_pension),
          jefe_mujer=factor(jefe_mujer),
@@ -163,25 +163,10 @@ test<- test %>%
 
 ##Modelo2
 
-train_control <- trainControl(
-  method = "cv",
-  number = 5,
-  classProbs = TRUE,
-  summaryFunction = defaultSummary,
-  savePredictions = TRUE
-)
-
 modelo2 <- glm(Pobre ~., 
                family = "binomial",
                data = train)
 
-set.seed(13505)
-modelo2.1 <- train(modelo2,
-  method = "glm",
-  data = train,
-  family = "binomial",
-  trControl = train_control
-)
 
 #Envío para Kaggle
 
@@ -192,7 +177,7 @@ predictSample <- test   %>%
 head(predictSample)
 
 predictSample<- predictSample %>% 
-  mutate(pobre=ifelse(pobre_lab=="Yes",1,0)) %>% 
+  mutate(pobre=ifelse(pobre_lab>0.5,1,0)) %>% 
   select(id,pobre)
 
 write.csv(predictSample,"Logit2.csv", row.names = FALSE)
