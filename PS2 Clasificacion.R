@@ -9,7 +9,10 @@ p_load( tidyverse, # tidy-data
         caret, # creating predictive models
         rpart, #Árbol
         rpart.plot, #Graficos de Árbol
-        ranger #Random Forest
+        ranger, #Random Forest
+        xgboost,
+        gbm, #boosting trees
+        Metrics
 )
 
 #Cargamos la base de datos
@@ -27,16 +30,15 @@ ptrain_personas<- train_personas %>% mutate(
   edad=P6040,
   jefe = ifelse(P6050== 1, 1, 0), # 1 si es jefe de hogar
   menor = ifelse(P6040<=12,1,0), # Menores de 12 años
-  EducLevel = ifelse(P6210==9|P6210==0,0,P6210), #No sabe no responde es 0
+  EducLevel = ifelse(P6210==9|is.na(P6210)|P6210==0,0,P6210), #No sabe no responde es 0
   ocupado = ifelse(is.na(Oc),0,1), 
-  contributivo=ifelse(P6090==1|P6090==2,1,0), #No sabe no responde es 0 (1 )
+  contributivo=ifelse(P6090==1|is.na(P6090)|P6090==2,1,0), #No sabe no responde es 0 (1 )
   trabaja=ifelse(P6240==1,1,0), # 1 si el individuo trabaja
   Oficio=ifelse(is.na(Oficio),0,Oficio), 
   trabaja_solo=ifelse(P6870==1|is.na(P6870),1,0), # 1 Si el individuo trabaja solo
   h_trabajadas=ifelse(is.na(P6800),0,P6800),
   tiempotrab = P6426,# Tiempo que lleva trabajando en la empresa
   sin_pension = ifelse((P7500s2 == 2 | is.na(P7500s2)) & ((edad >= 62 & genero == 0) | (edad >= 57 & genero == 1)), 1, 0), #Sin pension cuando debería
-  p=P7500s2,
   pet=ifelse(Pet==1,1,0)# Hace parte de la pob en edad de trabajar
   ) %>% 
 select(id, Orden,genero,edad,cabecera,jefe,menor,EducLevel,trabaja_solo,contributivo,h_trabajadas,ocupado,contributivo,trabaja,Oficio,tiempotrab,sin_pension,pet)
@@ -51,16 +53,15 @@ ptest_personas<- test_personas %>% mutate(
   edad=P6040,
   jefe = ifelse(P6050== 1, 1, 0), # 1 si es jefe de hogar
   menor = ifelse(P6040<=12,1,0), # Menores de 12 años
-  EducLevel = ifelse(P6210==9|P6210==0,0,P6210), #No sabe no responde es 0
+  EducLevel = ifelse(P6210==9|is.na(P6210)|P6210==0,0,P6210), #No sabe no responde es 0
   ocupado = ifelse(is.na(Oc),0,1), 
-  contributivo=ifelse(P6090==1|P6090==2,1,0), #No sabe no responde es 0 (1 )
+  contributivo=ifelse(P6090==1|is.na(P6090)|P6090==2,1,0), #No sabe no responde es 0 (1 )
   trabaja=ifelse(P6240==1,1,0), # 1 si el individuo trabaja
   Oficio=ifelse(is.na(Oficio),0,Oficio), 
   trabaja_solo=ifelse(P6870==1|is.na(P6870),1,0), # 1 Si el individuo trabaja solo
   h_trabajadas=ifelse(is.na(P6800),0,P6800),
   tiempotrab = P6426,# Tiempo que lleva trabajando en la empresa
   sin_pension = ifelse((P7500s2 == 2 | is.na(P7500s2)) & ((edad >= 62 & genero == 0) | (edad >= 57 & genero == 1)), 1, 0), #Sin pension cuando debería
-  p=P7500s2,
   pet=ifelse(Pet==1,1,0)# Hace parte de la pob en edad de trabajar
 ) %>% 
   select(id, Orden,genero,edad,cabecera,jefe,menor,EducLevel,trabaja_solo,contributivo,h_trabajadas,ocupado,contributivo,trabaja,Oficio,tiempotrab,sin_pension,pet)
@@ -87,7 +88,8 @@ train_personas_hogar<- ptrain_personas %>%
          jefe_solo=trabaja_solo,
          jefe_contrib=contributivo,
          jefe_sin_pension=sin_pension,
-         jefe_edad=edad) %>% 
+         jefe_edad=edad,
+         ) %>% 
   left_join(train_personas_nivel_hogar)
 
 
@@ -111,7 +113,8 @@ test_personas_hogar<- ptest_personas %>%
          jefe_solo=trabaja_solo,
          jefe_contrib=contributivo,
          jefe_sin_pension=sin_pension,
-         jefe_edad=edad) %>% 
+         jefe_edad=edad,
+         ) %>% 
   left_join(test_personas_nivel_hogar)
 
 #Criterio de Pobreza del DANE
@@ -140,46 +143,28 @@ train<- train %>%
   mutate(Pobre=factor(Pobre,levels=c(0,1),labels=c("No","Yes")),
          arrienda=factor(arrienda),
          Dominio=factor(Dominio),
-         jefe_Educ_level=factor(jefe_Educ_level,levels=c(1:6), labels=c('Ninguno', 'Preescolar','Primaria', 'Secundaria','Media', 'Universitaria')),
+         jefe_Educ_level=factor(jefe_Educ_level,levels=c(0:6), labels=c("NS",'Ninguno', 'Preescolar','Primaria', 'Secundaria','Media', 'Universitaria')),
          maxEducLevel=factor(maxEducLevel,levels=c(0:6), labels=c("Ns",'Ninguno', 'Preescolar','Primaria', 'Secundaria','Media', 'Universitaria')),
          jefe_contrib=factor(jefe_contrib),
          jefe_sin_pension=factor(jefe_sin_pension),
          jefe_mujer=factor(jefe_mujer),
          jefe_ocupado=factor(jefe_ocupado),
          jefe_solo=factor(jefe_solo)
-         
          
   )
 #Para Test
 test<- test %>% 
   mutate(Dominio=factor(Dominio),
          arrienda=factor(arrienda),
-         jefe_Educ_level=factor(jefe_Educ_level,levels=c(1:6), labels=c('Ninguno', 'Preescolar','Primaria', 'Secundaria','Media', 'Universitaria')),
+         jefe_Educ_level=factor(jefe_Educ_level,levels=c(0:6), labels=c("NS",'Ninguno', 'Preescolar','Primaria', 'Secundaria','Media', 'Universitaria')),
          maxEducLevel=factor(maxEducLevel,levels=c(0:6), labels=c("Ns",'Ninguno', 'Preescolar','Primaria', 'Secundaria','Media', 'Universitaria')),
          jefe_contrib=factor(jefe_contrib),
          jefe_sin_pension=factor(jefe_sin_pension),
          jefe_mujer=factor(jefe_mujer),
          jefe_ocupado=factor(jefe_ocupado),
-         jefe_solo=factor(jefe_solo)
+         jefe_solo=factor(jefe_solo),
          
   )
-
-#Entrenamiento del Modelo Random Forest
-
-set.seed(2618)
-tree_ranger_grid <- train(
-  Pobre~.,
-  data=train,
-  method = "ranger",
-  trControl = fitControl,
-  tuneGrid=expand.grid(
-    mtry = c(1,2,3),
-    splitrule = "variance",
-    min.node.size = c(1,3,5)),
-  importance="impurity"
-)
-
-
 
 #Entrenamiento del modelo Carts
 
@@ -192,7 +177,12 @@ arbol_clasificacion_rpart <- rpart(Pobre~.,
 arbol_clasificacion_rpart
 
 #Arbol gráfico
+#1
 prp(arbol_clasificacion_rpart, under = TRUE, branch.lty = 2, yesno = 2, faclen = 0, varlen=15,box.palette = "-RdYlGn")
+#2
+prp(arbol_clasificacion_rpart, under = TRUE, branch.lty = 2, yesno = 2, faclen = 0, varlen=15,tweak=1.2,clip.facs= TRUE,box.palette = "Greens",compress=TRUE,ycompress = TRUE) 
+
+#Podado del árbol!!!
 
 
 #Envío para Kagglee
@@ -208,4 +198,116 @@ predictSample<- predictSample %>%
   select(id,pobre)
 
 write.csv(predictSample,"classification_CARTS.csv", row.names = FALSE)
- 
+
+
+#Entrenamiento del Modelo Random Forest
+
+set.seed(2618)
+tree_ranger_grid <- train(
+  Pobre~.,
+  data=train,
+  method = "ranger",
+  tuneGrid=expand.grid(
+    mtry = c(8,10,12),
+    splitrule = "gini",
+    min.node.size = c(70,75,80)),
+  importance="impurity"
+)
+
+tree_ranger_grid
+
+# Opción 1: Que tan bueno es este modelo para predecir fuera de muestra:
+RF<- ranger(Pobre~., 
+            data = train,
+            num.trees= 500, ## Numero de bootstrap samples y arboles a estimar. Default 500  
+            mtry= 10,   # N. var aleatoriamente seleccionadas en cada partición. Baggin usa todas las vars.
+            min.node.size  = 75, ## Numero minimo de observaciones en un nodo para intentar 
+            importance="impurity") 
+RF
+
+
+#Opción 2: Definimos el proceso de CV
+
+fiveStats <- function(...) c(twoClassSummary(...), defaultSummary(...))
+ctrl<- trainControl(method = "cv",
+                    number = 5,
+                    summaryFunction = fiveStats,
+                    classProbs = TRUE,
+                    verbose=FALSE,
+                    savePredictions = T)
+
+mtry_grid<-expand.grid(mtry =c(2,4,6,8), # 
+                       min.node.size= c(1, 5, 10, 20, 35, 50), #controla la complejidad del arbol
+                       splitrule= 'gini') #splitrule fija en gini. 
+mtry_grid
+
+cv_RForest <- train(Pobre~., 
+                    data = train, 
+                    method = "ranger",
+                    trControl = ctrl,
+                    metric="ROC",
+                    tuneGrid = mtry_grid,
+                    ntree=500)
+cv_RForest
+
+#Ver el modelo fianl
+cv_RForest$finalModel
+
+#Vemos cuales son los predictores mas importantes:
+varImp(tree_ranger_grid)
+
+
+#Envío Kaggle
+#Opción 1
+predictSample <- test   %>% 
+  mutate(pobre_lab = predict(tree_ranger_grid, newdata = test, type = "raw")    ## predicted class labels
+  )  %>% select(id,pobre_lab)
+
+#Opción 2
+predictSample <- test   %>% 
+  mutate(pobre_lab = predict(cv_RForest, 
+                   newdata = test, 
+                   type="raw"))  %>% select(id,pobre_lab)
+
+
+
+head(predictSample)
+
+predictSample<- predictSample %>% 
+  mutate(pobre=ifelse(pobre_lab=="Yes",1,0)) %>% 
+  select(id,pobre)
+
+write.csv(predictSample,"classification_RandomForest.csv", row.names = FALSE)
+
+#Prueba con Boosting trees
+
+#Grilla
+set.seed(2618)
+grid_gbm<-expand.grid(n.trees=c(200,300,500),
+                      interaction.depth=c(2,6,10),
+                      shrinkage=c(0.01),
+                      n.minobsinnode = c(10,20,30))
+grid_gbm
+
+set.seed(2618)
+gbm_tree <- train( log(Sale_Price) ~ Gr_Liv_Area  + Bldg_Type + Fence,
+                   data=ames,
+                   method = "gbm", 
+                   trControl = fitControl,
+                   tuneGrid=grid_gbm,
+                   verbose = FALSE
+)            
+gbm_tree
+
+#Envío Kaggle
+predictSample <- test   %>% 
+  mutate(pobre_lab = predict(tree_ranger_grid, newdata = test, type = "class")    ## predicted class labels
+  )  %>% select(id,pobre_lab)
+
+head(predictSample)
+
+predictSample<- predictSample %>% 
+  mutate(pobre=ifelse(pobre_lab=="Yes",1,0)) %>% 
+  select(id,pobre)
+
+write.csv(predictSample,"classification_BoostingTrees.csv", row.names = FALSE)
