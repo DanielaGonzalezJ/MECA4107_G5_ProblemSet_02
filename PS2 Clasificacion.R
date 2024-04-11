@@ -166,24 +166,33 @@ test<- test %>%
          
   )
 
-#Entrenamiento del modelo Carts
+#Entrenamiento del modelo Carts con CV para penalización
 
+fiveStats <- function(...) c(twoClassSummary(...), defaultSummary(...))  ## Para usar ROC) (u otras más) para tuning
 set.seed(2618)
-arbol_clasificacion_rpart <- rpart(Pobre~., 
-                                   data    = train,
-                                   method = "class",
-                                   parms = list(split = "Gini"))
+ctrl<- trainControl(method = "cv",
+                    number = 5,
+                    summaryFunction = fiveStats,
+                    classProbs = TRUE, 
+                    verbose=FALSE,
+                    savePredictions = T)
 
-arbol_clasificacion_rpart
+# Especificamos la grilla de los alphas
+grid <- expand.grid(cp = seq(0, 0.03, 0.001))
+
+cv_tree <- train(Default~duration+amount+installment+age+ history+purpose+foreign+rent,
+                 data = train,
+                 method = "rpart", 
+                 trControl = ctrl, 
+                 tuneGrid = grid, 
+                 metric= "ROC"
+)
+cv_tree
+
+cv_tree$bestTune$cp
 
 #Arbol gráfico
-#1
-prp(arbol_clasificacion_rpart, under = TRUE, branch.lty = 2, yesno = 2, faclen = 0, varlen=15,box.palette = "-RdYlGn")
-#2
-prp(arbol_clasificacion_rpart, under = TRUE, branch.lty = 2, yesno = 2, faclen = 0, varlen=15,tweak=1.2,clip.facs= TRUE,box.palette = "Greens",compress=TRUE,ycompress = TRUE) 
-
-#Podado del árbol!!!
-
+prp(cv_tree$finalModel, under = TRUE, branch.lty = 2, yesno = 2, faclen = 0, varlen=15,box.palette = "-RdYlGn")
 
 #Envío para Kagglee
 
@@ -197,10 +206,10 @@ predictSample<- predictSample %>%
   mutate(pobre=ifelse(pobre_lab=="Yes",1,0)) %>% 
   select(id,pobre)
 
-write.csv(predictSample,"classification_CARTS.csv", row.names = FALSE)
+write.csv(predictSample,"classification_CARTS_3.csv", row.names = FALSE)
 
 
-#Entrenamiento del Modelo Random Forest
+# Opción 1: Entrenamiento del Modelo Random Forest
 
 set.seed(2618)
 tree_ranger_grid <- train(
@@ -216,18 +225,19 @@ tree_ranger_grid <- train(
 
 tree_ranger_grid
 
-# Opción 1: Que tan bueno es este modelo para predecir fuera de muestra:
+# Que tan bueno es este modelo para predecir fuera de muestra:
 RF<- ranger(Pobre~., 
             data = train,
             num.trees= 500, ## Numero de bootstrap samples y arboles a estimar. Default 500  
-            mtry= 10,   # N. var aleatoriamente seleccionadas en cada partición. Baggin usa todas las vars.
-            min.node.size  = 75, ## Numero minimo de observaciones en un nodo para intentar 
+            mtry= 8,   # N. var aleatoriamente seleccionadas en cada partición. Baggin usa todas las vars.
+            min.node.size  = 50, ## Numero minimo de observaciones en un nodo para intentar 
             importance="impurity") 
 RF
 
 
 #Opción 2: Definimos el proceso de CV
 
+set.seed(2618)
 fiveStats <- function(...) c(twoClassSummary(...), defaultSummary(...))
 ctrl<- trainControl(method = "cv",
                     number = 5,
@@ -236,8 +246,8 @@ ctrl<- trainControl(method = "cv",
                     verbose=FALSE,
                     savePredictions = T)
 
-mtry_grid<-expand.grid(mtry =c(2,4,6,8), # 
-                       min.node.size= c(1, 5, 10, 20, 35, 50), #controla la complejidad del arbol
+mtry_grid<-expand.grid(mtry =c(8,11,15), # 
+                       min.node.size= c(50,60,70,80), #controla la complejidad del arbol
                        splitrule= 'gini') #splitrule fija en gini. 
 mtry_grid
 
@@ -277,9 +287,9 @@ predictSample<- predictSample %>%
   mutate(pobre=ifelse(pobre_lab=="Yes",1,0)) %>% 
   select(id,pobre)
 
-write.csv(predictSample,"classification_RandomForest.csv", row.names = FALSE)
+write.csv(predictSample,"classification_RandomForest_3.csv", row.names = FALSE)
 
-#Prueba con Boosting trees
+#####Prueba con Boosting trees#####
 
 #Grilla
 set.seed(2618)
