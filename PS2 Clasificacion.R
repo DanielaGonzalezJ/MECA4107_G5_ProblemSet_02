@@ -195,7 +195,7 @@ arbol_clasificacion_rpart
 prp(arbol_clasificacion_rpart, under = TRUE, branch.lty = 2, yesno = 2, faclen = 0, varlen=15,box.palette = "-RdYlGn")
 
 
-#Envío para Kaggle
+#Envío para Kagglee
 
 predictSample <- test   %>% 
   mutate(pobre_lab = predict(arbol_clasificacion_rpart, newdata = test, type = "class")    ## predicted class labels
