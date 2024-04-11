@@ -170,21 +170,23 @@ train_control <- trainControl(
   summaryFunction = defaultSummary,
   savePredictions = TRUE
 )
+
 modelo2 <- glm(Pobre ~., 
                family = "binomial",
                data = train)
+
 set.seed(13505)
-modelo2 <- train(
-  Pobre ~.,
+modelo2.1 <- train(modelo2,
   method = "glm",
   data = train,
   family = "binomial",
   trControl = train_control
 )
+
 #Envío para Kaggle
 
 predictSample <- test   %>% 
-  mutate(pobre_lab = predict(modelo2, newdata = test)    ## predicted class labels
+  mutate(pobre_lab = predict(modelo2, newdata = test, type = "response")    ## predicted class labels
   )  %>% select(id,pobre_lab)
 
 head(predictSample)
