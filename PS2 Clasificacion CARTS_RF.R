@@ -180,7 +180,7 @@ ctrl<- trainControl(method = "cv",
 # Especificamos la grilla de los alphas
 grid <- expand.grid(cp = seq(0, 0.03, 0.001))
 
-cv_tree <- train(Default~duration+amount+installment+age+ history+purpose+foreign+rent,
+cv_tree <- train(Pobre~.,
                  data = train,
                  method = "rpart", 
                  trControl = ctrl, 
@@ -206,36 +206,11 @@ predictSample<- predictSample %>%
   mutate(pobre=ifelse(pobre_lab=="Yes",1,0)) %>% 
   select(id,pobre)
 
-write.csv(predictSample,"classification_CARTS_3.csv", row.names = FALSE)
+write.csv(predictSample,"classification_CARTS_4.csv", row.names = FALSE)
 
 
-# Opción 1: Entrenamiento del Modelo Random Forest
-
-set.seed(2618)
-tree_ranger_grid <- train(
-  Pobre~.,
-  data=train,
-  method = "ranger",
-  tuneGrid=expand.grid(
-    mtry = c(8,10,12),
-    splitrule = "gini",
-    min.node.size = c(70,75,80)),
-  importance="impurity"
-)
-
-tree_ranger_grid
-
-# Que tan bueno es este modelo para predecir fuera de muestra:
-RF<- ranger(Pobre~., 
-            data = train,
-            num.trees= 500, ## Numero de bootstrap samples y arboles a estimar. Default 500  
-            mtry= 8,   # N. var aleatoriamente seleccionadas en cada partición. Baggin usa todas las vars.
-            min.node.size  = 50, ## Numero minimo de observaciones en un nodo para intentar 
-            importance="impurity") 
-RF
-
-
-#Opción 2: Definimos el proceso de CV
+# Entrenamiento del Modelo Random Forest
+# Definimos el proceso de CV
 
 set.seed(2618)
 fiveStats <- function(...) c(twoClassSummary(...), defaultSummary(...))
@@ -268,18 +243,10 @@ varImp(tree_ranger_grid)
 
 
 #Envío Kaggle
-#Opción 1
-predictSample <- test   %>% 
-  mutate(pobre_lab = predict(tree_ranger_grid, newdata = test, type = "raw")    ## predicted class labels
-  )  %>% select(id,pobre_lab)
-
-#Opción 2
 predictSample <- test   %>% 
   mutate(pobre_lab = predict(cv_RForest, 
                    newdata = test, 
                    type="raw"))  %>% select(id,pobre_lab)
-
-
 
 head(predictSample)
 
