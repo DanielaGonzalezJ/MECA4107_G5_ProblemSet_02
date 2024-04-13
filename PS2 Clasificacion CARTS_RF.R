@@ -166,6 +166,7 @@ test<- test %>%
          
   )
 
+#Modelos de Clasifiación
 #Entrenamiento del modelo Carts con CV para penalización
 
 fiveStats <- function(...) c(twoClassSummary(...), defaultSummary(...))  ## Para usar ROC) (u otras más) para tuning
@@ -197,7 +198,7 @@ prp(cv_tree$finalModel, under = TRUE, branch.lty = 2, yesno = 2, faclen = 0, var
 #Envío para Kagglee
 
 predictSample <- test   %>% 
-  mutate(pobre_lab = predict(arbol_clasificacion_rpart, newdata = test, type = "class")    ## predicted class labels
+  mutate(pobre_lab = predict(cv_tree, newdata = test, type = "raw")    ## predicted class labels
   )  %>% select(id,pobre_lab)
 
 head(predictSample)
@@ -206,7 +207,8 @@ predictSample<- predictSample %>%
   mutate(pobre=ifelse(pobre_lab=="Yes",1,0)) %>% 
   select(id,pobre)
 
-write.csv(predictSample,"classification_CARTS_4.csv", row.names = FALSE)
+
+write.csv(predictSample,"classification_CARTS_5.csv", row.names = FALSE)
 
 
 # Entrenamiento del Modelo Random Forest
@@ -239,7 +241,6 @@ cv_RForest
 cv_RForest$finalModel
 
 #Vemos cuales son los predictores mas importantes:
-varImp(tree_ranger_grid)
 
 
 #Envío Kaggle
@@ -254,37 +255,8 @@ predictSample<- predictSample %>%
   mutate(pobre=ifelse(pobre_lab=="Yes",1,0)) %>% 
   select(id,pobre)
 
-write.csv(predictSample,"classification_RandomForest_3.csv", row.names = FALSE)
+write.csv(predictSample,"classification_RandomForest_4.csv", row.names = FALSE)
 
-#####Prueba con Boosting trees#####
+#Modelos de Regresión
 
-#Grilla
-set.seed(2618)
-grid_gbm<-expand.grid(n.trees=c(200,300,500),
-                      interaction.depth=c(2,6,10),
-                      shrinkage=c(0.01),
-                      n.minobsinnode = c(10,20,30))
-grid_gbm
 
-set.seed(2618)
-gbm_tree <- train( log(Sale_Price) ~ Gr_Liv_Area  + Bldg_Type + Fence,
-                   data=ames,
-                   method = "gbm", 
-                   trControl = fitControl,
-                   tuneGrid=grid_gbm,
-                   verbose = FALSE
-)            
-gbm_tree
-
-#Envío Kaggle
-predictSample <- test   %>% 
-  mutate(pobre_lab = predict(tree_ranger_grid, newdata = test, type = "class")    ## predicted class labels
-  )  %>% select(id,pobre_lab)
-
-head(predictSample)
-
-predictSample<- predictSample %>% 
-  mutate(pobre=ifelse(pobre_lab=="Yes",1,0)) %>% 
-  select(id,pobre)
-
-write.csv(predictSample,"classification_BoostingTrees.csv", row.names = FALSE)
