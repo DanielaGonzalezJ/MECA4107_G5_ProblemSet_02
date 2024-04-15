@@ -1,19 +1,10 @@
-###  Modelos de Clasificación Cart//Random Forest
-#Según la base del DANE un hogar es clasificado pobre si el “Ingreso percápita de la unidad de gasto con imputación de arriendo a propietarios y usufructuarios” es menor a la Linea de pobreza que le corresponde al hogar.
-
-#rm(list = ls())
+#Estadísticas Descriptivas
 
 if(!require(pacman)) install.packages("pacman") ; require(pacman)
 p_load( tidyverse, # tidy-data
-        glmnet, # To implement regularization algorithms. 
-        caret, # creating predictive models
-        rpart, #Árbol
-        rpart.plot, #Graficos de Árbol
-        ranger, #Random Forest
-        xgboost,
-        gbm, #boosting trees
-        Metrics,
-        ggplot2
+        stargazer,
+        ggplot2,
+        xtable
 )
 
 #Cargamos la base de datos
@@ -41,8 +32,8 @@ ptrain_personas<- train_personas %>% mutate(
   tiempotrab = P6426,# Tiempo que lleva trabajando en la empresa
   sin_pension = ifelse((P7500s2 == 2 | is.na(P7500s2)) & ((edad >= 62 & genero == 0) | (edad >= 57 & genero == 1)), 1, 0), #Sin pension cuando debería
   pet=ifelse(Pet==1,1,0)# Hace parte de la pob en edad de trabajar
-  ) %>% 
-select(id, Orden,genero,edad,cabecera,jefe,menor,EducLevel,trabaja_solo,contributivo,h_trabajadas,ocupado,contributivo,trabaja,Oficio,tiempotrab,sin_pension,pet)
+) %>% 
+  select(id, Orden,genero,edad,cabecera,jefe,menor,EducLevel,trabaja_solo,contributivo,h_trabajadas,ocupado,contributivo,trabaja,Oficio,tiempotrab,sin_pension,pet)
 
 colnames(ptrain_personas)
 
@@ -90,7 +81,7 @@ train_personas_hogar<- ptrain_personas %>%
          jefe_contrib=contributivo,
          jefe_sin_pension=sin_pension,
          jefe_edad=edad,
-         ) %>% 
+  ) %>% 
   left_join(train_personas_nivel_hogar)
 
 
@@ -115,7 +106,7 @@ test_personas_hogar<- ptest_personas %>%
          jefe_contrib=contributivo,
          jefe_sin_pension=sin_pension,
          jefe_edad=edad,
-         ) %>% 
+  ) %>% 
   left_join(test_personas_nivel_hogar)
 
 #Preprocesamiento para hogares
@@ -167,97 +158,57 @@ test<- test %>%
          
   )
 
-#Modelos de Clasifiación
-#Entrenamiento del modelo Carts con CV para penalización
 
-fiveStats <- function(...) c(twoClassSummary(...), defaultSummary(...))  ## Para usar ROC) (u otras más) para tuning
-set.seed(2618)
-ctrl<- trainControl(method = "cv",
-                    number = 5,
-                    summaryFunction = fiveStats,
-                    classProbs = TRUE, 
-                    verbose=FALSE,
-                    savePredictions = T)
-
-# Especificamos la grilla de los alphas
-grid <- expand.grid(cp = seq(0, 0.03, 0.001))
-
-cv_tree_c <- train(Pobre~.,
-                 data = train,
-                 method = "rpart", 
-                 trControl = ctrl, 
-                 tuneGrid = grid, 
-                 metric= "ROC"
-)
-cv_tree_c
-
-#Arbol gráfico
-#prp(cv_tree_c$finalModel, under = TRUE, branch.lty = 2, yesno = 2, faclen = 0, varlen=15,box.palette = "-RdYlGn")
-#fancyRpartPlot(cv_tree_c$finalModel, sub="",main="Arbol de Calsificación Carts")
-
-#Envío para Kagglee
-
-predictSample <- test   %>% 
-  mutate(pobre_lab = predict(cv_tree_c, newdata = test, type = "raw")    ## predicted class labels
-  )  %>% select(id,pobre_lab)
-
-head(predictSample)
-
-predictSample<- predictSample %>% 
-  mutate(pobre=ifelse(pobre_lab=="Yes",1,0)) %>% 
-  select(id,pobre)
+hola <- stargazer(test,summary=T, out="Estaditicas", type="latex", title="Estadisticas Descriptivas Variables numéricas")
 
 
-write.csv(predictSample,"classification_CARTS_5.csv", row.names = FALSE)
+test_2<- test %>%
+  select(-nocupados,-nmenores,-nmujeres,-rel_pet,-horas_trab_por_persona,-jefe_edad)
+
+sum <- summary(test_2)
+
+print(xtable(as.table(sum), type = "Text"), file = "test.doc")
+
+colnames(test)
+
+tabla_frecuencia <- table(test$maxEducLevel)
+
+# Convertir la tabla de frecuencias en un data frame
+datos_frecuencia <- as.data.frame(tabla_frecuencia)
+names(datos_frecuencia) <- c("Educación_Máxima", "Frecuencia")
+
+# Crear el histograma con ggplot2
+ggplot(datos_frecuencia, aes(x = Educación_Máxima, y = Frecuencia)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  labs(x = "Educacion Máxima", y = "Frecuencia", title = "Categorización del maximo nivel Escolar Alcanzado") +
+  theme_classic()
+
+tabla_frecuencia <- table(test$Dominio)
+
+# Convertir la tabla de frecuencias en un data frame
+datos_frecuencia <- as.data.frame(tabla_frecuencia)
+names(datos_frecuencia) <- c("Educación_Máxima", "Frecuencia")
+
+# Crear el histograma con ggplot2
+ggplot(datos_frecuencia, aes(x = Educación_Máxima, y = Frecuencia)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  labs(x = "Educacion Máxima", y = "Frecuencia", title = "Categorización del maximo nivel Escolar Alcanzado") +
+  theme_classic()
 
 
-# Entrenamiento del Modelo Random Forest
-# Definimos el proceso de CV
 
-set.seed(2618)
-fiveStats <- function(...) c(twoClassSummary(...), defaultSummary(...))
-ctrl<- trainControl(method = "cv",
-                    number = 5,
-                    summaryFunction = fiveStats,
-                    classProbs = TRUE,
-                    verbose=FALSE,
-                    savePredictions = T)
 
-mtry_grid<-expand.grid(mtry =c(8,11,15), # 
-                       min.node.size= c(50,60,70,80), #controla la complejidad del arbol
-                       splitrule= 'gini') #splitrule fija en gini. 
-mtry_grid
 
-cv_RForest_c <- train(Pobre~., 
-                    data = train, 
-                    method = "ranger",
-                    trControl = ctrl,
-                    metric="ROC",
-                    tuneGrid = mtry_grid,
-                    ntree=500,
-                    importance="impurity")
-cv_RForest_c
 
-#Ver el modelo fianl
-cv_RForest_c$finalModel
 
-### Importancia por Variable
-p_1 <- varImp(cv_RForest_c)
-plot(p_1)
+tabla_frecuencia <- table(test$jefe_sin_pension)
 
-asdkasñld <- plot(p_1, top = 10, ylab='Variable',xlab='Relevancia para el modelo',main='Importancia por Variable',type='s',col="black")
-png("MECA4107_G5_ProblemSet_02/views/p_1.png", width = 800, height = 600)  # 
+# Convertir la tabla de frecuencias en un data frame
+datos_frecuencia <- as.data.frame(tabla_frecuencia)
+names(datos_frecuencia) <- c("Jefes de Hogar sin Pension (Estando en edad de Pensión)", "Frecuencia")
 
-#Envío Kaggle
-predictSample <- test   %>% 
-  mutate(pobre_lab = predict(cv_RForest_c, 
-                   newdata = test, 
-                   type="raw"))  %>% select(id,pobre_lab)
-
-head(predictSample)
-
-predictSample<- predictSample %>% 
-  mutate(pobre=ifelse(pobre_lab=="Yes",1,0)) %>% 
-  select(id,pobre)
-
-write.csv(predictSample,"classification_RandomForest_4.csv", row.names = FALSE)
+# Crear el histograma con ggplot2
+ggplot(datos_frecuencia, aes(x =  'Jefes de Hogar sin Pension (Estando en edad de Pensión) ', y = Frecuencia)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  labs(x = "Pensionado", y = "Frecuencia", title = "Jefes de Hogar sin Pension (Estando en edad de Pensión)") +
+  theme_classic()
