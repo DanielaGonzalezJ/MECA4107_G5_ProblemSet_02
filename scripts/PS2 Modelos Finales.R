@@ -8,7 +8,9 @@ datos <- data.frame(
 )
 
 # Crear el gráfico de barras
-ggplot(datos, aes(x = variable, y = frecuencia)) +
+p_3 <- ggplot(datos, aes(x = variable, y = frecuencia)) +
   geom_bar(stat = "identity",fill = "skyblue") +
   labs(x = "Variable", y = "F1", title = "Éxito de la Predicción por Método para clasificación")+
   theme_minimal()
+
+png("MECA4107_G5_ProblemSet_02/views/p_3.png", width = 800, height = 600)

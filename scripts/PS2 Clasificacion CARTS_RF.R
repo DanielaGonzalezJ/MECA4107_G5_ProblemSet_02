@@ -245,7 +245,7 @@ cv_RForest_c$finalModel
 p_1 <- varImp(cv_RForest_c)
 plot(p_1)
 
-asdkasñld <- plot(p_1, top = 10, ylab='Variable',xlab='Relevancia para el modelo',main='Importancia por Variable',type='s',col="black")
+P_1 <- plot(p_1, top = 10, ylab='Variable',xlab='Relevancia para el modelo',main='Importancia por Variable',type='s',col="black")
 png("MECA4107_G5_ProblemSet_02/views/p_1.png", width = 800, height = 600)  # 
 
 #Envío Kaggle
@@ -261,3 +261,5 @@ predictSample<- predictSample %>%
   select(id,pobre)
 
 write.csv(predictSample,"classification_RandomForest_4.csv", row.names = FALSE)
+
+

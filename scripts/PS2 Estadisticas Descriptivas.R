@@ -159,7 +159,7 @@ test<- test %>%
   )
 
 
-hola <- stargazer(test,summary=T, out="Estaditicas", type="latex", title="Estadisticas Descriptivas Variables numéricas")
+stg <- stargazer(test,summary=T, out="Estaditicas", type="latex", title="Estadisticas Descriptivas Variables numéricas")
 
 
 test_2<- test %>%
@@ -179,7 +179,7 @@ names(datos_frecuencia) <- c("Educación_Máxima", "Frecuencia")
 
 # Crear el histograma con ggplot2
 ggplot(datos_frecuencia, aes(x = Educación_Máxima, y = Frecuencia)) +
-  geom_bar(stat = "identity", fill = "skyblue") +
+  geom_bar(stat = "identity", fill = "red") +
   labs(x = "Educacion Máxima", y = "Frecuencia", title = "Categorización del maximo nivel Escolar Alcanzado") +
   theme_classic()
 
@@ -187,24 +187,27 @@ tabla_frecuencia <- table(test$Dominio)
 
 # Convertir la tabla de frecuencias en un data frame
 datos_frecuencia <- as.data.frame(tabla_frecuencia)
-names(datos_frecuencia) <- c("Educación_Máxima", "Frecuencia")
+names(datos_frecuencia) <- c("Dominio", "Frecuencia")
 
 # Crear el histograma con ggplot2
-ggplot(datos_frecuencia, aes(x = Educación_Máxima, y = Frecuencia)) +
-  geom_bar(stat = "identity", fill = "skyblue") +
-  labs(x = "Educacion Máxima", y = "Frecuencia", title = "Categorización del maximo nivel Escolar Alcanzado") +
-  theme_classic()
-
-
+ggplot(datos_frecuencia, aes(x = Dominio, y = Frecuencia)) +
+  geom_bar(stat = "identity", fill = "orange") +
+  labs(x = "Dominio", y = "Frecuencia", title = "Encuestados por región") +
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
 
 
 
 
 tabla_frecuencia <- table(test$jefe_sin_pension)
+tabla_frecuencia <- data.frame(
+  columna1 = c("Sin_Pnesion", "Con_pension"),
+  columna2 = c(53121 , 13047 )
+)
+
 
 # Convertir la tabla de frecuencias en un data frame
-datos_frecuencia <- as.data.frame(tabla_frecuencia)
 names(datos_frecuencia) <- c("Jefes de Hogar sin Pension (Estando en edad de Pensión)", "Frecuencia")
 
 # Crear el histograma con ggplot2
