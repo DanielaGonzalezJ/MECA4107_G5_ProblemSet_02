@@ -165,7 +165,6 @@ test<- test %>%
          
   )
 
-
 #Modelos de Regresión
 #CART
 
@@ -185,6 +184,10 @@ cv_tree <- train(Ingpcug~.,
                  metric= "RMSE"
 )
 cv_tree
+#Graficar el Arbol
+prp(cv_tree$finalModel, under = TRUE, branch.lty = 3, yesno = 2, faclen = 0, varlen=10,tweak=1.2,clip.facs= TRUE,box.palette = "Greens",compress=FALSE,ycompress = T)
+p_load(rattle, ggplot2)
+fancyRpartPlot(cv_tree$finalModel, sub="",main="Modelo de Regresión Carts")
 
 
 #Envío para Kagglee
@@ -213,7 +216,7 @@ ctrl<- trainControl(method = "cv",
 
 mtry_grid<-expand.grid(mtry =c(15,18,20), # c(8,11,15)
                        min.node.size= c(15,20,25,30,35), #controla la complejidad del arbol
-                       splitrule= 'variance') #splitrule fija en gini. 
+                       splitrule= 'variance') #splitrule 
 mtry_grid
 
 cv_RForest <- train(Ingpcug~., 
@@ -225,6 +228,14 @@ cv_RForest <- train(Ingpcug~.,
                     ntree=500,
                     importance="impurity")
 cv_RForest
+### Importancia por Variable
+varImp(cv_RForest)
+
+p_2 <- varImp(cv_RForest)
+
+p_2 <- plot(p_2, top = 10, ylab='Variable',xlab='Relevancia para el modelo',main='Importancia por Variable',type='s',col="black")
+png("MECA4107_G5_ProblemSet_02/views/p_1.png", width = 800, height = 600)  # 
+
 
 #Envío para Kagglee
 

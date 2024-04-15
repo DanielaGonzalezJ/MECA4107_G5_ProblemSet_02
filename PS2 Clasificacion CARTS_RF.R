@@ -12,7 +12,8 @@ p_load( tidyverse, # tidy-data
         ranger, #Random Forest
         xgboost,
         gbm, #boosting trees
-        Metrics
+        Metrics,
+        ggplot2
 )
 
 #Cargamos la base de datos
@@ -68,7 +69,7 @@ ptest_personas<- test_personas %>% mutate(
 
 colnames(ptest_personas)
 
-#Preprocesamiento Hogares
+#Preprocesamiento Hogares desde personas
 train_personas_nivel_hogar<- ptrain_personas %>% 
   group_by(id) %>% 
   summarize(nmujeres=sum(genero,na.rm=TRUE),
@@ -117,7 +118,7 @@ test_personas_hogar<- ptest_personas %>%
          ) %>% 
   left_join(test_personas_nivel_hogar)
 
-#Criterio de Pobreza del DANE
+#Preprocesamiento para hogares
 ptrain_hogares<- train_hogares %>% 
   mutate(arrienda=ifelse(P5090==3,1,0)) %>% 
   select(id,Dominio,arrienda,Pobre)
@@ -181,24 +182,23 @@ ctrl<- trainControl(method = "cv",
 # Especificamos la grilla de los alphas
 grid <- expand.grid(cp = seq(0, 0.03, 0.001))
 
-cv_tree <- train(Pobre~.,
+cv_tree_c <- train(Pobre~.,
                  data = train,
                  method = "rpart", 
                  trControl = ctrl, 
                  tuneGrid = grid, 
                  metric= "ROC"
 )
-cv_tree
-
-cv_tree$bestTune$cp
+cv_tree_c
 
 #Arbol gráfico
-#prp(cv_tree$finalModel, under = TRUE, branch.lty = 2, yesno = 2, faclen = 0, varlen=15,box.palette = "-RdYlGn")
+#prp(cv_tree_c$finalModel, under = TRUE, branch.lty = 2, yesno = 2, faclen = 0, varlen=15,box.palette = "-RdYlGn")
+#fancyRpartPlot(cv_tree_c$finalModel, sub="",main="Arbol de Calsificación Carts")
 
 #Envío para Kagglee
 
 predictSample <- test   %>% 
-  mutate(pobre_lab = predict(cv_tree, newdata = test, type = "raw")    ## predicted class labels
+  mutate(pobre_lab = predict(cv_tree_c, newdata = test, type = "raw")    ## predicted class labels
   )  %>% select(id,pobre_lab)
 
 head(predictSample)
@@ -228,24 +228,28 @@ mtry_grid<-expand.grid(mtry =c(8,11,15), #
                        splitrule= 'gini') #splitrule fija en gini. 
 mtry_grid
 
-cv_RForest <- train(Pobre~., 
+cv_RForest_c <- train(Pobre~., 
                     data = train, 
                     method = "ranger",
                     trControl = ctrl,
                     metric="ROC",
                     tuneGrid = mtry_grid,
-                    ntree=500)
-cv_RForest
+                    ntree=500,
+                    importance="impurity")
+cv_RForest_c
 
 #Ver el modelo fianl
-cv_RForest$finalModel
+cv_RForest_c$finalModel
 
-#Vemos cuales son los predictores mas importantes:
+### Importancia por Variable
+p_1 <- varImp(cv_RForest_c)
 
+p_1 <- plot(p_1, top = 10, ylab='Variable',xlab='Relevancia para el modelo',main='Importancia por Variable',type='s',col="black")
+png("MECA4107_G5_ProblemSet_02/views/p_1.png", width = 800, height = 600)  # 
 
 #Envío Kaggle
 predictSample <- test   %>% 
-  mutate(pobre_lab = predict(cv_RForest, 
+  mutate(pobre_lab = predict(cv_RForest_c, 
                    newdata = test, 
                    type="raw"))  %>% select(id,pobre_lab)
 
@@ -256,29 +260,3 @@ predictSample<- predictSample %>%
   select(id,pobre)
 
 write.csv(predictSample,"classification_RandomForest_4.csv", row.names = FALSE)
-
-#Modelos de Regresión
-
-fiveStats <- function(...) c(twoClassSummary(...), defaultSummary(...))  ## Para usar ROC) (u otras más) para tuning
-set.seed(2618)
-ctrl<- trainControl(method = "cv",
-                    number = 5,
-                    summaryFunction = fiveStats,
-                    classProbs = TRUE, 
-                    verbose=FALSE,
-                    savePredictions = T)
-
-# Especificamos la grilla de los alphas
-grid <- expand.grid(cp = seq(0, 0.03, 0.001))
-
-cv_tree <- train(Pobre~.,
-                 data = train,
-                 method = "rpart", 
-                 trControl = ctrl, 
-                 tuneGrid = grid, 
-                 metric= "ROC"
-)
-cv_tree
-
-cv_tree$bestTune$cp
-
