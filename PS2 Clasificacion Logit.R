@@ -126,12 +126,9 @@ train<- ptrain_hogares %>%
   left_join(train_personas_hogar) %>% 
   select(-id) #no longer need id
 
-train <- train %>% mutate(jefe_contrib = ifelse(is.na(jefe_contrib), 1, jefe_contrib))
 
 test<- ptest_hogares %>% 
   left_join(test_personas_hogar)
-
-test <- test %>% mutate(jefe_contrib = ifelse(is.na(jefe_contrib), 1, jefe_contrib))
 
 #Convertimos las variables categóricas en factores
 #Para Train
